@@ -37,7 +37,7 @@ T ThreadSafeContainer<T>::Pop(void)
 }
 
 template<class T>
-size_t ThreadSafeContainer<T>::GetSize(void)
+size_t ThreadSafeContainer<T>::GetSize(void) const
 {
 	return m_List.size();
 }

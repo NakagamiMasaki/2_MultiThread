@@ -60,7 +60,7 @@ public:
 	/**
 	* @brief	要素数取得
 	*/
-	size_t GetSize(void);
+	size_t GetSize(void) const;
 };
 
 //===== インクルード =====
