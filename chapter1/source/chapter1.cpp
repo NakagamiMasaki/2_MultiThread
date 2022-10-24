@@ -13,6 +13,7 @@
 #include <process.h>
 #include <mutex>
 #include <list>
+#include "ThreadSafeContainer.h"
 
 //-----------------------------------------------------------------------------
 // Macro Definitions
@@ -22,6 +23,8 @@
 #define	MIN		1
 #define	MAX		13
 #define RESULT	833197		// この計算はこの値になります
+
+#define NUM_THREAD 2
 
 //-----------------------------------------------------------------------------
 // Using Namespace
@@ -46,8 +49,7 @@ namespace ex02_MultiThread
 		//-----------------------------------------------------------------------------
 		// Global Variables
 		//-----------------------------------------------------------------------------
-		std::list<Parameter>	g_Parameters;
-		std::mutex				g_Mutex;
+		ThreadSafeContainer<Parameter>	g_Parameter;
 
 		//-----------------------------------------------------------------------------
 		// Implements
@@ -66,15 +68,35 @@ namespace ex02_MultiThread
 				Param.x = Random(MIN, MAX);
 				Param.y = Random(MIN, MAX);
 				Param.z = Random(MIN, MAX);
-
-				// アクセス権を獲得できるまでブロック
-				g_Mutex.lock();
-				g_Parameters.push_back(Param);
-				g_Mutex.unlock();
 			}
 
 			::_endthreadex(0);
 			return 0;
+		}
+
+		unsigned WINAPI CalcTarai(LPVOID pArgs)
+		{
+			// ループ範囲確定
+			int* pThreadID = reinterpret_cast<int*>(pArgs);
+			const int BasePos = N / NUM_THREAD * *pThreadID;
+			const int LoopCount = N / NUM_THREAD + BasePos;
+
+			// 計算
+			int sum = 0;
+			for (int i = BasePos; i < LoopCount; ++i)
+			{
+				if (g_Parameter.GetSize() <= 0)
+				{
+					
+					continue;
+				}
+
+				auto Param = g_Parameter.Pop();
+				sum += Tarai(Param.x, Param.y, Param.z);
+			}
+
+			_endthreadex(sum);
+			return sum;
 		}
 
 		/**************************************************************************//**
@@ -85,11 +107,12 @@ namespace ex02_MultiThread
 #if 1
 		int DoWork()
 		{
-			int sum = 0;
+			// +1はパラメータ生成用スレッド
+			HANDLE ThreadHandles[NUM_THREAD + 1];
 
 			// パラメータ生成開始
-			auto Thread = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::GenParameter, NULL, 0, NULL);
-			if (Thread == 0 || reinterpret_cast<long>(Thread) == -1L)
+			ThreadHandles[NUM_THREAD] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::GenParameter, NULL, 0, NULL);
+			if (ThreadHandles == 0 || reinterpret_cast<long>(ThreadHandles) == -1L)
 			{
 				// スレッド起動失敗
 				return -1;
@@ -100,20 +123,30 @@ namespace ex02_MultiThread
 			// 15msもあればある程度はパラメータの生成も終わっているはず(全て終わってなくてもいい)
 			::Sleep(15);
 
-			// Tarai計算
-			for (int i = 0; i < N; ++i)
+			// 計算開始
+			int ThreadID[NUM_THREAD] = { 0, 1 };
+			for (int i = 0; i < NUM_THREAD; ++i)
 			{
-				// アクセス権を獲得できるまでブロック
-				g_Mutex.lock();
-				auto Param = g_Parameters.front();	// 先頭を削除したいのでコピー
-				g_Parameters.pop_front();
-				g_Mutex.unlock();
-
-				sum += Tarai(Param.x, Param.y, Param.z);
+				ThreadHandles[i] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::CalcTarai, &ThreadID[i], 0, NULL);
+				if (ThreadHandles == 0 || reinterpret_cast<long>(ThreadHandles) == -1L)
+				{
+					// スレッド起動失敗
+					return -1;
+				}
 			}
 
-			::WaitForSingleObject(Thread, INFINITE);
-			::CloseHandle(Thread);
+			::WaitForMultipleObjects(NUM_THREAD + 1, ThreadHandles, TRUE, INFINITE);
+			int sum = 0;
+			for (int i = 0; i < NUM_THREAD + 1; ++i)
+			{
+				DWORD ExitCode = 0;
+				if (GetExitCodeThread(ThreadHandles[i], &ExitCode))
+				{
+					sum += static_cast<int>(ExitCode);
+				}
+
+				::CloseHandle(ThreadHandles[i]);
+			}
 
 			return sum;
 		}
