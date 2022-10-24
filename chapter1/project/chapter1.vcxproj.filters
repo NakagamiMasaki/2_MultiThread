@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="chapter1">
+      <UniqueIdentifier>{a1c61544-03d2-4ed9-85f6-f3b4dd6f94a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="chapter1\source">
+      <UniqueIdentifier>{918a869a-90eb-486c-9f87-59ed46de6b5d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{6c14ee2f-7429-4f70-a0fb-0950d773492d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\include">
+      <UniqueIdentifier>{cb3ab54e-9d6e-480b-b807-d03d7a26fccb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\source\chapter1.cpp">
+      <Filter>chapter1\source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\common\include\functions.h">
+      <Filter>common\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
