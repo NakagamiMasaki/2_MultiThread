@@ -24,7 +24,9 @@
 #define	MAX		13
 #define RESULT	833197		// この計算はこの値になります
 
-#define NUM_THREAD 2
+#define NUM_CALC_THREAD		 2				// tarai()計算スレッドの個数
+#define NUM_GEN_PARAM_THREAD 1				// パラメータ生成スレッドの個数(rand()がスレッドセーフじゃないので1固定)
+#define NUM_THREAD			 (NUM_CALC_THREAD + NUM_GEN_PARAM_THREAD)
 
 //-----------------------------------------------------------------------------
 // Using Namespace
@@ -61,33 +63,35 @@ namespace ex02_MultiThread
 		unsigned WINAPI GenParameter(LPVOID pArgs)
 		{
 			// パラメータ生成
-			for (int i = 0; i < N; ++i)
+			for (int i = 0; i < N / NUM_GEN_PARAM_THREAD; ++i)
 			{
 				Parameter Param;
 
 				Param.x = Random(MIN, MAX);
 				Param.y = Random(MIN, MAX);
 				Param.z = Random(MIN, MAX);
+
+				g_Parameter.Push(Param);
 			}
 
 			::_endthreadex(0);
 			return 0;
 		}
 
+		/**************************************************************************//**
+			@brief		計算を行います
+			@return		Tarai関数で計算した結果
+		*//***************************************************************************/
 		unsigned WINAPI CalcTarai(LPVOID pArgs)
 		{
-			// ループ範囲確定
-			int* pThreadID = reinterpret_cast<int*>(pArgs);
-			const int BasePos = N / NUM_THREAD * *pThreadID;
-			const int LoopCount = N / NUM_THREAD + BasePos;
-
 			// 計算
 			int sum = 0;
-			for (int i = BasePos; i < LoopCount; ++i)
+			for (int i = 0; i < N / NUM_CALC_THREAD; ++i)
 			{
+				// 要素が無ければカウントを進めずにループ
 				if (g_Parameter.GetSize() <= 0)
 				{
-					
+					--i;
 					continue;
 				}
 
@@ -108,36 +112,34 @@ namespace ex02_MultiThread
 		int DoWork()
 		{
 			// +1はパラメータ生成用スレッド
-			HANDLE ThreadHandles[NUM_THREAD + 1];
+			HANDLE ThreadHandles[NUM_THREAD];
 
 			// パラメータ生成開始
-			ThreadHandles[NUM_THREAD] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::GenParameter, NULL, 0, NULL);
-			if (ThreadHandles == 0 || reinterpret_cast<long>(ThreadHandles) == -1L)
+			for (int i = 0; i < NUM_GEN_PARAM_THREAD; ++i)
 			{
-				// スレッド起動失敗
-				return -1;
-			}
-
-			// 少し待たないとパラメータが適切に設定されていない
-			// Sleep()は15ms単位でしか待機時間を決められない
-			// 15msもあればある程度はパラメータの生成も終わっているはず(全て終わってなくてもいい)
-			::Sleep(15);
-
-			// 計算開始
-			int ThreadID[NUM_THREAD] = { 0, 1 };
-			for (int i = 0; i < NUM_THREAD; ++i)
-			{
-				ThreadHandles[i] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::CalcTarai, &ThreadID[i], 0, NULL);
-				if (ThreadHandles == 0 || reinterpret_cast<long>(ThreadHandles) == -1L)
+				ThreadHandles[NUM_CALC_THREAD + i] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::GenParameter, NULL, 0, NULL);
+				if (ThreadHandles[NUM_CALC_THREAD + i] == 0 || reinterpret_cast<long>(ThreadHandles[NUM_CALC_THREAD + i]) == -1L)
 				{
 					// スレッド起動失敗
 					return -1;
 				}
 			}
 
-			::WaitForMultipleObjects(NUM_THREAD + 1, ThreadHandles, TRUE, INFINITE);
+			// 計算開始
+			for (int i = 0; i < NUM_CALC_THREAD; ++i)
+			{
+				ThreadHandles[i] = (HANDLE)::_beginthreadex(NULL, 0, ex02_MultiThread::chapter1::CalcTarai, NULL, 0, NULL);
+				if (ThreadHandles[i] == 0 || reinterpret_cast<long>(ThreadHandles[i]) == -1L)
+				{
+					// スレッド起動失敗
+					return -1;
+				}
+			}
+
+			// 全ての処理が終わるまで待機
+			::WaitForMultipleObjects(NUM_THREAD, ThreadHandles, TRUE, INFINITE);
 			int sum = 0;
-			for (int i = 0; i < NUM_THREAD + 1; ++i)
+			for (int i = 0; i < NUM_CALC_THREAD; ++i)
 			{
 				DWORD ExitCode = 0;
 				if (GetExitCodeThread(ThreadHandles[i], &ExitCode))
