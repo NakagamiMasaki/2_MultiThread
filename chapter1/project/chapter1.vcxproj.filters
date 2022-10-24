@@ -23,5 +23,9 @@
     <ClInclude Include="..\..\common\include\functions.h">
       <Filter>common\include</Filter>
     </ClInclude>
+    <ClInclude Include="..\source\ThreadSafeContainer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\source\ThreadSafeContainer.inl" />
   </ItemGroup>
 </Project>
